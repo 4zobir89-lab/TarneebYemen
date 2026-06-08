@@ -67,6 +67,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             trumpSuit = null,
             trickCards = emptyMap(),
             roundTrickCount = 0,
+            roundNumber = it.roundNumber + 1,
             statusMessage = "بدأت المزايدة",
             trickStarterId = kiayalId,
             currentTurnPlayerId = kiayalId
@@ -213,12 +214,28 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { it.copy(
             players = newPlayers,
             trumpSuit = trump,
-            phase = GamePhase.PLAYING,
-            currentTurnPlayerId = hakemId,
-            trickStarterId = hakemId,
-            statusMessage = "الحكم هو ${trump.arabicName} ${trump.symbol}. ${_state.value.players[hakemId].name} يبدأ!"
+            phase = GamePhase.TRUMP_REVEAL,
+            trickCards = emptyMap(),
+            trickSuit = null,
+            roundTrickCount = 0,
+            currentTurnPlayerId = 0,
+            statusMessage = "✨ كشف الترمب..."
         )}
-        handleAITurn()
+        viewModelScope.launch {
+            delay(2800)
+            _state.update {
+                if (it.phase != GamePhase.TRUMP_REVEAL) return@update it
+                it.copy(
+                    phase = GamePhase.PLAYING,
+                    currentTurnPlayerId = hakemId,
+                    trickStarterId = hakemId,
+                    trickCards = emptyMap(),
+                    trickSuit = null,
+                    statusMessage = "الحكم هو ${trump.arabicName} ${trump.symbol}. ${_state.value.players[hakemId].name} يبدأ!"
+                )
+            }
+            handleAITurn()
+        }
     }
 
     fun humanPlayCard(card: Card) {

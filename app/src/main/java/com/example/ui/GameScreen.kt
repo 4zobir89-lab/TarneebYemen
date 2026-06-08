@@ -21,7 +21,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -39,6 +38,7 @@ fun GameScreen(modifier: Modifier = Modifier, viewModel: GameViewModel = viewMod
 
     Box(modifier = modifier.fillMaxSize().background(TableGreen)) {
         Box(modifier = Modifier.fillMaxSize().background(createFeltBrush()))
+        FeltOverlay()
 
         if (state.phase == GamePhase.IDLE) {
             StartScreen(onClick = { viewModel.startGame() })
@@ -82,16 +82,27 @@ private fun createFeltBrush(): Brush {
 
 @Composable
 fun FeltOverlay() {
-    Canvas(modifier = Modifier.fillMaxSize().alpha(0.03f)) {
-        val spacing = 60f
-        var x = 0f
-        while (x < size.width) {
-            var y = 0f
-            while (y < size.height) {
-                drawCircle(Color.White, 1.5f, Offset(x, y))
-                y += spacing
+    Canvas(modifier = Modifier.fillMaxSize().alpha(0.04f)) {
+        val spacing = 80f
+        val diamondSize = 24f
+        var row = 0
+        var y = 0f
+        while (y < size.height) {
+            val xOffset = if (row % 2 == 0) 0f else spacing / 2f
+            var x = xOffset
+            while (x < size.width) {
+                val path = Path().apply {
+                    moveTo(x, y - diamondSize / 2f)
+                    lineTo(x + diamondSize / 2f, y)
+                    lineTo(x, y + diamondSize / 2f)
+                    lineTo(x - diamondSize / 2f, y)
+                    close()
+                }
+                drawPath(path, Color.White.copy(alpha = 0.5f), style = Stroke(1.2f))
+                x += spacing
             }
-            x += spacing
+            row++
+            y += spacing * 0.7f
         }
     }
 }
@@ -107,11 +118,9 @@ fun StartScreen(onClick: () -> Unit) {
 
     Box(
         modifier = Modifier
-            .fillMaxSize()
-            .background(createFeltBrush()),
+            .fillMaxSize(),
         contentAlignment = Alignment.Center
     ) {
-        FeltOverlay()
         AnimatedVisibility(
             visible = visible,
             enter = fadeIn(tween(800)) + scaleIn(initialScale = 0.6f, animationSpec = spring(dampingRatio = 0.6f))
@@ -239,6 +248,118 @@ fun TrumpBadge(suit: Suit) {
     }
 }
 
+// ─── Trump Reveal Animation ───────────────────────────────────
+
+@Composable
+fun TrumpRevealAnimation(trumpSuit: Suit) {
+    val flipProgress = remember { Animatable(0f) }
+    val glowAlpha = remember { Animatable(0f) }
+    val pulseScale = remember { Animatable(0.85f) }
+    var revealed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(trumpSuit) {
+        flipProgress.animateTo(1f, tween(1400, easing = FastOutSlowInEasing))
+        revealed = true
+        glowAlpha.animateTo(0.7f, tween(300))
+        glowAlpha.animateTo(0.15f, tween(500))
+        glowAlpha.animateTo(0.5f, tween(400))
+        while (true) {
+            pulseScale.animateTo(1.05f, tween(600, easing = FastOutSlowInEasing))
+            pulseScale.animateTo(0.85f, tween(600, easing = FastOutSlowInEasing))
+        }
+    }
+
+    Box(
+        modifier = Modifier.size(130.dp, 185.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer {
+                    rotationY = flipProgress.value * 180f
+                    cameraDistance = 12f * density
+                }
+        ) {
+            if (flipProgress.value < 0.45f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            alpha = 1f - (flipProgress.value / 0.45f).coerceIn(0f, 1f)
+                        }
+                ) {
+                    CardBackLarge()
+                }
+            }
+            if (flipProgress.value > 0.55f) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            rotationY = 180f
+                            alpha = ((flipProgress.value - 0.55f) / 0.45f).coerceIn(0f, 1f)
+                        }
+                        .background(CardWhite, RoundedCornerShape(18.dp))
+                        .border(2.dp, Color(trumpSuit.color).copy(alpha = 0.6f), RoundedCornerShape(18.dp))
+                ) {
+                    Box(
+                        modifier = Modifier.fillMaxSize().padding(14.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text(trumpSuit.symbol, fontSize = 52.sp, color = Color(trumpSuit.color))
+                            Spacer(Modifier.height(6.dp))
+                            Text(trumpSuit.arabicName, fontSize = 20.sp, color = Color(trumpSuit.color),
+                                fontWeight = FontWeight.Bold)
+                            Spacer(Modifier.height(10.dp))
+                            Text("الحكم", fontSize = 16.sp, color = YemenGold, fontWeight = FontWeight.Bold)
+                        }
+                    }
+                }
+            }
+        }
+
+        if (revealed) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        alpha = glowAlpha.value
+                        scaleX = pulseScale.value
+                        scaleY = pulseScale.value
+                    }
+                    .background(Color(trumpSuit.color).copy(alpha = 0.35f), RoundedCornerShape(18.dp))
+            )
+        }
+    }
+}
+
+@Composable
+fun CardBackLarge() {
+    Canvas(modifier = Modifier.fillMaxSize()) {
+        val w = size.width; val h = size.height
+        drawRoundRect(CardBackColor, cornerRadius = CornerRadius(18f, 18f))
+        drawRoundRect(Color(0xFF8B0000), cornerRadius = CornerRadius(18f, 18f),
+            topLeft = Offset(6f, 6f), size = Size(w - 12f, h - 12f), style = Stroke(width = 2.5f))
+
+        val cx = w / 2f; val cy = h / 2f
+        val diamondPath = Path().apply {
+            val s = w * 0.15f
+            moveTo(cx, cy - s)
+            lineTo(cx + s * 0.7f, cy)
+            lineTo(cx, cy + s)
+            lineTo(cx - s * 0.7f, cy)
+            close()
+        }
+        drawPath(diamondPath, Color(0x55FFD700), style = Stroke(2f))
+        drawCircle(Color(0x33FFD700), w * 0.28f, Offset(cx, cy))
+        drawCircle(Color(0x22FFD700), w * 0.18f, Offset(cx, cy))
+        drawLine(Color(0x28FFD700), Offset(cx - w * 0.2f, cy), Offset(cx + w * 0.2f, cy), strokeWidth = 1.5f)
+        drawLine(Color(0x28FFD700), Offset(cx, cy - w * 0.2f), Offset(cx, cy + w * 0.2f), strokeWidth = 1.5f)
+    }
+}
+
 // ─── Table Center Area ────────────────────────────────────────
 
 @Composable
@@ -247,7 +368,9 @@ fun TableCenterArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
         modifier = modifier.fillMaxWidth().height(230.dp),
         contentAlignment = Alignment.Center
     ) {
-        if (state.phase == GamePhase.FIELD_DECISION && state.field.isNotEmpty()) {
+        if (state.phase == GamePhase.TRUMP_REVEAL && state.trumpSuit != null) {
+            TrumpRevealAnimation(state.trumpSuit!!)
+        } else if (state.phase == GamePhase.FIELD_DECISION && state.field.isNotEmpty()) {
             CenterLabel("الميدان")
             val fieldAnim = remember { Animatable(0f) }
             LaunchedEffect(state.field) {
@@ -281,6 +404,18 @@ fun TableCenterArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
             ) {
                 state.trickCards.entries.forEachIndexed { index, (playerId, card) ->
                     val isWinner = playerId == state.currentTurnPlayerId && state.phase == GamePhase.PLAYING
+                    val winGlow = remember { Animatable(0f) }
+                    LaunchedEffect(isWinner) {
+                        if (isWinner) {
+                            while (true) {
+                                winGlow.animateTo(1f, tween(600, easing = FastOutSlowInEasing))
+                                winGlow.animateTo(0.3f, tween(600, easing = FastOutSlowInEasing))
+                            }
+                        } else {
+                            winGlow.snapTo(0f)
+                        }
+                    }
+
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.padding(horizontal = 4.dp)
@@ -288,7 +423,7 @@ fun TableCenterArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
                         Box(
                             modifier = Modifier
                                 .background(
-                                    if (isWinner) YemenGold.copy(alpha = 0.25f)
+                                    if (isWinner) YemenGold.copy(alpha = 0.25f + winGlow.value * 0.3f)
                                     else PlayerColors[playerId % PlayerColors.size].copy(alpha = 0.2f),
                                     RoundedCornerShape(8.dp)
                                 )
@@ -296,11 +431,14 @@ fun TableCenterArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
                         ) {
                             CardView(
                                 card = card,
+                                isWinner = isWinner,
+                                winGlow = winGlow.value,
                                 modifier = Modifier.graphicsLayer {
                                     translationY = if (index % 2 == 0) -8f else 8f
                                     if (isWinner) {
-                                        scaleX = 1.1f; scaleY = 1.1f
-                                        shadowElevation = 12f
+                                        scaleX = 1.1f + winGlow.value * 0.05f
+                                        scaleY = 1.1f + winGlow.value * 0.05f
+                                        shadowElevation = 12f + winGlow.value * 6f
                                     }
                                 }
                             )
@@ -316,8 +454,16 @@ fun TableCenterArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
             }
         } else if (state.phase == GamePhase.PLAYING) {
             if (state.trumpSuit != null) {
+                val suitPulse = remember { Animatable(0.1f) }
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        suitPulse.animateTo(0.2f, tween(2000, easing = FastOutSlowInEasing))
+                        suitPulse.animateTo(0.1f, tween(2000, easing = FastOutSlowInEasing))
+                    }
+                }
                 Text(state.trumpSuit!!.symbol, fontSize = 56.sp,
-                    color = Color(state.trumpSuit!!.color).copy(alpha = 0.12f))
+                    color = Color(state.trumpSuit!!.color)
+                        .copy(alpha = suitPulse.value))
             }
             if (state.trickCards.isEmpty()) {
                 Text("اختر ورقة للعب", color = TextSecondary.copy(alpha = 0.5f), fontSize = 13.sp)
@@ -587,6 +733,8 @@ fun HumanPlayerArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
 
                         CardView(
                             card = card,
+                            showDealAnimation = state.roundNumber > 0,
+                            dealIndex = index,
                             modifier = Modifier
                                 .offset(y = yOffset)
                                 .graphicsLayer {
@@ -613,29 +761,52 @@ fun HumanPlayerArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
 // ─── Card View ────────────────────────────────────────────────
 
 @Composable
-fun CardView(card: Card, modifier: Modifier = Modifier, facedown: Boolean = false) {
-    var animProgress by remember { mutableStateOf(0f) }
-    LaunchedEffect(Unit) {
-        for (i in 0..10) {
-            animProgress = i / 10f
-            delay(15)
+fun CardView(
+    card: Card,
+    modifier: Modifier = Modifier,
+    facedown: Boolean = false,
+    showDealAnimation: Boolean = false,
+    dealIndex: Int = 0,
+    isWinner: Boolean = false,
+    winGlow: Float = 0f
+) {
+    var dealProgress by remember { mutableFloatStateOf(1f) }
+    LaunchedEffect(showDealAnimation, dealIndex) {
+        if (showDealAnimation) {
+            delay(dealIndex * 70L)
+            for (i in 0..12) {
+                dealProgress = i / 12f
+                delay(16)
+            }
+            dealProgress = 1f
         }
-        animProgress = 1f
     }
 
-    val scale = animateFloatAsState(
-        targetValue = if (facedown) 1f else (0.9f + animProgress * 0.1f),
-        animationSpec = spring(dampingRatio = 0.6f)
-    )
+    val targetScale = 0.85f + dealProgress * 0.15f
 
     Surface(
         modifier = modifier
             .width(64.dp)
             .height(92.dp)
-            .graphicsLayer(scaleX = scale.value, scaleY = scale.value, alpha = animProgress)
-            .shadow(if (facedown) 2.dp else 8.dp, RoundedCornerShape(10.dp)),
+            .graphicsLayer {
+                scaleX = targetScale
+                scaleY = targetScale
+                alpha = dealProgress
+                translationY = (1f - dealProgress) * (-80f)
+                if (isWinner) {
+                    shadowElevation = 12f + winGlow * 6f
+                }
+            }
+            .shadow(
+                if (facedown) 2.dp else (if (isWinner) (8.dp + winGlow * 6.dp) else 8.dp),
+                RoundedCornerShape(10.dp)
+            ),
         shape = RoundedCornerShape(10.dp),
-        color = if (facedown) CardBackColor else CardWhite
+        color = if (facedown) CardBackColor else CardWhite,
+        border = if (isWinner) BorderStroke(
+            (1.5f + winGlow * 1.5f).dp,
+            YemenGold.copy(alpha = 0.5f + winGlow * 0.5f)
+        ) else null
     ) {
         if (facedown) {
             CardBack()
@@ -675,11 +846,21 @@ fun CardBack() {
         drawRoundRect(CardBackColor, cornerRadius = CornerRadius(10f, 10f))
         drawRoundRect(Color(0xFF8B0000), cornerRadius = CornerRadius(10f, 10f),
             topLeft = Offset(4f, 4f), size = Size(w - 8f, h - 8f), style = Stroke(width = 2f))
+
         val cx = w / 2f; val cy = h / 2f
+        val diamondPath = Path().apply {
+            val s = w * 0.15f
+            moveTo(cx, cy - s)
+            lineTo(cx + s * 0.7f, cy)
+            lineTo(cx, cy + s)
+            lineTo(cx - s * 0.7f, cy)
+            close()
+        }
+        drawPath(diamondPath, Color(0x55FFD700), style = Stroke(1.5f))
         drawCircle(Color(0x44FFD700), w * 0.25f, Offset(cx, cy))
-        drawCircle(Color(0x44FFD700), w * 0.1f, Offset(cx, cy))
-        drawLine(Color(0x33FFD700), Offset(cx - 20f, cy), Offset(cx + 20f, cy), strokeWidth = 1.5f)
-        drawLine(Color(0x33FFD700), Offset(cx, cy - 20f), Offset(cx, cy + 20f), strokeWidth = 1.5f)
+        drawCircle(Color(0x33FFD700), w * 0.12f, Offset(cx, cy))
+        drawLine(Color(0x33FFD700), Offset(cx - w * 0.2f, cy), Offset(cx + w * 0.2f, cy), strokeWidth = 1.5f)
+        drawLine(Color(0x33FFD700), Offset(cx, cy - w * 0.2f), Offset(cx, cy + w * 0.2f), strokeWidth = 1.5f)
     }
 }
 

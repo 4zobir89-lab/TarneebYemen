@@ -35,7 +35,7 @@ enum class GamePhase {
     BIDDING,
     FIELD_DECISION,
     DISCARDING,
-    TRUMP_SELECTION,
+    TRUMP_REVEAL,
     PLAYING,
     ROUND_END,
     GAME_OVER
@@ -73,6 +73,9 @@ data class GameState(
     val trickSuit: Suit? = null,
     val roundTrickCount: Int = 0,
     
+    // Round tracking for animations
+    val roundNumber: Int = 0,
+
     // Status message for UI
     val statusMessage: String = "مرحباً بك في ترمب 187"
 )
