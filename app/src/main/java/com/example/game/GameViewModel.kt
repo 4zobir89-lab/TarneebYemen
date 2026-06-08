@@ -28,6 +28,10 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         _state.update { it.copy(players = players, phase = GamePhase.IDLE) }
     }
 
+    fun resetGame() {
+        _state.value = GameState()
+    }
+
     fun startGame() {
         kiayalId = 1
         startNewRound()
@@ -339,6 +343,25 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     private fun checkDahamAndNextRound() {
         val st = _state.value
         var newPlayers = st.players
+
+        val winner = newPlayers.find { it.redCards >= 7 }
+        if (winner != null) {
+            soundManager.playWin()
+            _state.update { it.copy(
+                phase = GamePhase.GAME_OVER,
+                statusMessage = "${winner.name} فاز باللعبة! ${winner.redCards} كروت حمراء. تهانينا!"
+            )}
+            return
+        }
+        val loser = newPlayers.find { it.blackCards >= 7 }
+        if (loser != null) {
+            soundManager.playLose()
+            _state.update { it.copy(
+                phase = GamePhase.GAME_OVER,
+                statusMessage = "${loser.name} خسر اللعبة! ${loser.blackCards} كروت سوداء."
+            )}
+            return
+        }
 
         val dahamer = newPlayers.find { it.redCards >= 3 }
         if (dahamer != null) {

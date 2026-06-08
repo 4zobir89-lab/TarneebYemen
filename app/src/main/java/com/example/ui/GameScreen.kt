@@ -8,6 +8,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -20,7 +21,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
-
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -44,7 +45,7 @@ fun GameScreen(modifier: Modifier = Modifier, viewModel: GameViewModel = viewMod
             return
         }
 
-        TopInfoBar(state)
+        TopInfoBar(state, onBack = { viewModel.resetGame() })
 
         TableCenterArea(state, viewModel, Modifier.align(Alignment.Center))
 
@@ -55,7 +56,11 @@ fun GameScreen(modifier: Modifier = Modifier, viewModel: GameViewModel = viewMod
 
         HumanPlayerArea(state, viewModel, Modifier.align(Alignment.BottomCenter).fillMaxWidth())
 
-        if (state.currentTurnPlayerId == 0) {
+        if (state.phase == GamePhase.GAME_OVER) {
+            GameOverDialog(state, viewModel)
+        } else if (state.phase == GamePhase.ROUND_END) {
+            RoundEndOverlay(state)
+        } else if (state.currentTurnPlayerId == 0) {
             when (state.phase) {
                 GamePhase.BIDDING -> BiddingDialog(state, viewModel)
                 GamePhase.FIELD_DECISION -> FieldDecisionDialog(state, viewModel)
@@ -75,55 +80,80 @@ private fun createFeltBrush(): Brush {
     )
 }
 
+@Composable
+fun FeltOverlay() {
+    Canvas(modifier = Modifier.fillMaxSize().alpha(0.03f)) {
+        val spacing = 60f
+        var x = 0f
+        while (x < size.width) {
+            var y = 0f
+            while (y < size.height) {
+                drawCircle(Color.White, 1.5f, Offset(x, y))
+                y += spacing
+            }
+            x += spacing
+        }
+    }
+}
+
 // ─── Start Screen ─────────────────────────────────────────────
 
 @Composable
 fun StartScreen(onClick: () -> Unit) {
     var visible by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { visible = true }
+    LaunchedEffect(Unit) {
+        visible = true
+    }
 
-    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(createFeltBrush()),
+        contentAlignment = Alignment.Center
+    ) {
+        FeltOverlay()
         AnimatedVisibility(
             visible = visible,
             enter = fadeIn(tween(800)) + scaleIn(initialScale = 0.6f, animationSpec = spring(dampingRatio = 0.6f))
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Card(
-                    modifier = Modifier.padding(32.dp),
-                    shape = RoundedCornerShape(28.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xDD0A1F0E)),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
+            Card(
+                modifier = Modifier.padding(24.dp),
+                shape = RoundedCornerShape(28.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xDD0A1F0E)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 24.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(40.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Column(modifier = Modifier.padding(40.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("♠ ♥ ♣ ♦", fontSize = 28.sp, color = YemenGold)
-                        Spacer(Modifier.height(16.dp))
-                        Text("الترمب اليمني", style = MaterialTheme.typography.displayLarge, color = YemenGold)
-                        Text("187", style = MaterialTheme.typography.headlineLarge, color = YemenSand)
-                        Spacer(Modifier.height(8.dp))
-                        Text("Tarneeb Yemeni", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
-                        Spacer(Modifier.height(32.dp))
-                        Button(
-                            onClick = onClick,
-                            colors = ButtonDefaults.buttonColors(containerColor = YemenRed),
-                            shape = RoundedCornerShape(16.dp),
-                            elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 8.dp),
-                            contentPadding = PaddingValues(horizontal = 48.dp, vertical = 18.dp)
-                        ) {
-                            Text("ابدأ اللعبة", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                        }
-                        Spacer(Modifier.height(12.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            repeat(5) { id ->
-                                Box(
-                                    modifier = Modifier
-                                        .size(12.dp)
-                                        .background(PlayerColors[id], CircleShape)
-                                )
-                            }
-                        }
-                        Spacer(Modifier.height(8.dp))
-                        Text("5 لاعبين", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
+                    Text("♠ ♥ ♣ ♦", fontSize = 28.sp, color = YemenGold)
+                    Spacer(Modifier.height(16.dp))
+                    Text("الترمب اليمني", style = MaterialTheme.typography.displayLarge, color = YemenGold)
+                    Text("187", style = MaterialTheme.typography.headlineLarge, color = YemenSand)
+                    Spacer(Modifier.height(8.dp))
+                    Text("Tarneeb Yemeni", style = MaterialTheme.typography.bodyLarge, color = TextSecondary)
+                    Spacer(Modifier.height(32.dp))
+                    Button(
+                        onClick = onClick,
+                        colors = ButtonDefaults.buttonColors(containerColor = YemenRed),
+                        shape = RoundedCornerShape(16.dp),
+                        elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 8.dp),
+                        contentPadding = PaddingValues(horizontal = 48.dp, vertical = 18.dp)
+                    ) {
+                        Text("ابدأ اللعبة", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = Color.White)
                     }
+                    Spacer(Modifier.height(12.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        repeat(5) { id ->
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .background(PlayerColors[id], CircleShape)
+                            )
+                        }
+                    }
+                    Spacer(Modifier.height(8.dp))
+                    Text("5 لاعبين", style = MaterialTheme.typography.bodyMedium, color = TextSecondary)
                 }
             }
         }
@@ -133,39 +163,57 @@ fun StartScreen(onClick: () -> Unit) {
 // ─── Top Info Bar ─────────────────────────────────────────────
 
 @Composable
-fun TopInfoBar(state: GameState) {
+fun TopInfoBar(state: GameState, onBack: () -> Unit) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
             .statusBarsPadding(),
         colors = CardDefaults.cardColors(containerColor = Color(0xDD0A1F0E)),
         shape = RoundedCornerShape(16.dp),
-        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
-            Text(
-                text = state.statusMessage,
-                color = StatusGold,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(4.dp))
-            Row(
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+        Row(
+            modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack, modifier = Modifier.size(36.dp)) {
+                Icon(
+                    Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "رجوع",
+                    tint = YemenGold
+                )
+            }
+
+            Column(
+                modifier = Modifier.weight(1f),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                InfoChip("المزايدة", if (state.highestBid > 100) "${state.highestBid}" else "-", StatusGold)
-                if (state.trumpSuit != null) {
-                    TrumpBadge(state.trumpSuit!!)
-                }
-                InfoChip("المارات", "${state.roundTrickCount}/8", StatusWhite)
-                if (state.hakemId != null) {
-                    InfoChip("الحاكم", state.players[state.hakemId!!].name, YemenSand)
-                }
+                Text(
+                    text = state.statusMessage,
+                    color = StatusGold,
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center,
+                    maxLines = 2
+                )
+            }
+
+            Spacer(Modifier.width(36.dp))
+        }
+
+        Row(
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 6.dp)
+        ) {
+            InfoChip("المزايدة", if (state.highestBid > 100) "${state.highestBid}" else "-", StatusGold)
+            if (state.trumpSuit != null) {
+                TrumpBadge(state.trumpSuit!!)
+            }
+            InfoChip("المارات", "${state.roundTrickCount}/8", StatusWhite)
+            if (state.hakemId != null) {
+                InfoChip("الحاكم", state.players[state.hakemId!!].name, YemenSand)
             }
         }
     }
@@ -196,25 +244,36 @@ fun TrumpBadge(suit: Suit) {
 @Composable
 fun TableCenterArea(state: GameState, viewModel: GameViewModel, modifier: Modifier = Modifier) {
     Box(
-        modifier = modifier.fillMaxWidth().height(220.dp),
+        modifier = modifier.fillMaxWidth().height(230.dp),
         contentAlignment = Alignment.Center
     ) {
         if (state.phase == GamePhase.FIELD_DECISION && state.field.isNotEmpty()) {
-            Text("الميدان", style = MaterialTheme.typography.labelSmall, color = TextSecondary,
-                modifier = Modifier.align(Alignment.TopCenter).padding(bottom = 4.dp))
+            CenterLabel("الميدان")
+            val fieldAnim = remember { Animatable(0f) }
+            LaunchedEffect(state.field) {
+                fieldAnim.snapTo(0f)
+                fieldAnim.animateTo(1f, tween(600))
+            }
             Row(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth().graphicsLayer { alpha = fieldAnim.value }
             ) {
                 state.field.forEachIndexed { index, card ->
-                    CardView(card = card, modifier = Modifier
-                        .padding(horizontal = 4.dp)
-                        .offset(y = if (index % 2 == 0) (-12).dp else 12.dp)
+                    CardView(
+                        card = card,
+                        modifier = Modifier
+                            .padding(horizontal = 4.dp)
+                            .offset(y = if (index % 2 == 0) (-12).dp else 12.dp)
+                            .graphicsLayer {
+                                translationX = (index - (state.field.size - 1) / 2f) * 8f * (1f - fieldAnim.value)
+                                alpha = fieldAnim.value
+                            }
                     )
                 }
             }
         } else if (state.trickCards.isNotEmpty()) {
+            CenterLabel("اللعب")
             Row(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically,
@@ -229,34 +288,57 @@ fun TableCenterArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
                         Box(
                             modifier = Modifier
                                 .background(
-                                    PlayerColors[playerId % PlayerColors.size].copy(alpha = 0.3f),
+                                    if (isWinner) YemenGold.copy(alpha = 0.25f)
+                                    else PlayerColors[playerId % PlayerColors.size].copy(alpha = 0.2f),
                                     RoundedCornerShape(8.dp)
                                 )
                                 .padding(2.dp)
                         ) {
-                            CardView(card = card, modifier = Modifier.graphicsLayer {
-                                translationY = if (index % 2 == 0) -8f else 8f
-                                if (isWinner) {
-                                    scaleX = 1.1f; scaleY = 1.1f
+                            CardView(
+                                card = card,
+                                modifier = Modifier.graphicsLayer {
+                                    translationY = if (index % 2 == 0) -8f else 8f
+                                    if (isWinner) {
+                                        scaleX = 1.1f; scaleY = 1.1f
+                                        shadowElevation = 12f
+                                    }
                                 }
-                            })
+                            )
                         }
-                        Text(state.players[playerId].name, color = PlayerColors[playerId % PlayerColors.size],
-                            fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                        Text(
+                            state.players[playerId].name,
+                            color = if (isWinner) YemenGold else PlayerColors[playerId % PlayerColors.size],
+                            fontSize = 10.sp,
+                            fontWeight = if (isWinner) FontWeight.Bold else FontWeight.Normal
+                        )
                     }
                 }
             }
-        } else if (state.phase == GamePhase.PLAYING && state.trickCards.isEmpty()) {
+        } else if (state.phase == GamePhase.PLAYING) {
+            if (state.trumpSuit != null) {
+                Text(state.trumpSuit!!.symbol, fontSize = 56.sp,
+                    color = Color(state.trumpSuit!!.color).copy(alpha = 0.12f))
+            }
+            if (state.trickCards.isEmpty()) {
+                Text("اختر ورقة للعب", color = TextSecondary.copy(alpha = 0.5f), fontSize = 13.sp)
+            }
+        } else if (state.phase == GamePhase.BIDDING) {
+            val biddersLeft = 5 - state.passedPlayers.size
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                if (state.trumpSuit != null) {
-                    Text(state.trumpSuit!!.symbol, fontSize = 48.sp,
-                        color = Color(state.trumpSuit!!.color).copy(alpha = 0.15f))
-                }
-                Text("اختر ورقة للعب", color = TextSecondary.copy(alpha = 0.6f),
-                    fontSize = 13.sp)
+                Text("المزايدة", fontSize = 22.sp, fontWeight = FontWeight.Bold,
+                    color = YemenGold.copy(alpha = 0.6f))
+                Spacer(Modifier.height(4.dp))
+                Text("المتبقي: $biddersLeft لاعبين",
+                    color = TextSecondary.copy(alpha = 0.5f), fontSize = 12.sp)
             }
         }
     }
+}
+
+@Composable
+fun CenterLabel(text: String) {
+    Text(text, style = MaterialTheme.typography.labelSmall, color = TextSecondary,
+        modifier = Modifier.align(Alignment.TopCenter).padding(bottom = 4.dp))
 }
 
 // ─── Player Avatar ────────────────────────────────────────────
@@ -288,7 +370,11 @@ fun PlayerAvatar(state: GameState, playerId: Int, modifier: Modifier = Modifier)
                         if (isTurn) YemenGold else PlayerColors[playerId % PlayerColors.size],
                         CircleShape
                     )
-                    .border(3.dp, if (isTurn) Color.White else Color.Transparent, CircleShape),
+                    .border(
+                        if (isTurn) 3.dp else 1.dp,
+                        if (isTurn) Color.White else Color.White.copy(alpha = 0.3f),
+                        CircleShape
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 Text("${playerId + 1}", color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
@@ -304,19 +390,127 @@ fun PlayerAvatar(state: GameState, playerId: Int, modifier: Modifier = Modifier)
             color = Color(0xDD0A1F0E),
             shape = RoundedCornerShape(10.dp)
         ) {
-            Column(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalAlignment = Alignment.CenterHorizontally) {
+            Column(
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
                 Text(player.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 11.sp)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(8.dp).background(Color(0xFFFF5252), CircleShape))
+                    Text("●", color = Color(0xFFFF5252), fontSize = 8.sp)
                     Spacer(Modifier.width(2.dp))
                     Text("${player.redCards}", color = Color(0xFFFF5252), fontSize = 10.sp)
-                    Spacer(Modifier.width(6.dp))
-                    Box(modifier = Modifier.size(8.dp).background(Color(0xFF616161), CircleShape))
+                    Spacer(Modifier.width(4.dp))
+                    Text("●", color = Color.Gray, fontSize = 8.sp)
                     Spacer(Modifier.width(2.dp))
                     Text("${player.blackCards}", color = Color.Gray, fontSize = 10.sp)
                 }
                 Text("${player.hand.size}", color = TextSecondary, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+// ─── Round End Overlay ────────────────────────────────────────
+
+@Composable
+fun RoundEndOverlay(state: GameState) {
+    var visible by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { visible = true }
+
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(tween(500)) + scaleIn(initialScale = 0.8f, tween(500))
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize().background(Color(0x88000000)),
+            contentAlignment = Alignment.Center
+        ) {
+            Card(
+                shape = RoundedCornerShape(24.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xDD0A1F0E)),
+                elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("انتهت الجولة", style = MaterialTheme.typography.headlineMedium, color = YemenGold)
+                    Spacer(Modifier.height(12.dp))
+                    Text(state.statusMessage, color = Color.White, fontSize = 14.sp,
+                        textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(16.dp))
+                    Text("النتيجة:", style = MaterialTheme.typography.titleLarge, color = YemenSand)
+                    Spacer(Modifier.height(8.dp))
+                    state.players.forEach { player ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        ) {
+                            Box(modifier = Modifier.size(8.dp).background(PlayerColors[player.id], CircleShape))
+                            Spacer(Modifier.width(8.dp))
+                            Text(player.name, color = Color.White, fontWeight = FontWeight.Bold,
+                                fontSize = 14.sp, modifier = Modifier.width(60.dp))
+                            Text("● ${player.redCards}", color = Color(0xFFFF5252), fontSize = 13.sp)
+                            Spacer(Modifier.width(8.dp))
+                            Text("● ${player.blackCards}", color = Color.Gray, fontSize = 13.sp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ─── Game Over Dialog ─────────────────────────────────────────
+
+@Composable
+fun GameOverDialog(state: GameState, viewModel: GameViewModel) {
+    Dialog(onDismissRequest = {}, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Card(
+            modifier = Modifier.fillMaxWidth().padding(24.dp),
+            shape = RoundedCornerShape(28.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E)),
+            elevation = CardDefaults.cardElevation(defaultElevation = 20.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("🏆", fontSize = 48.sp)
+                Spacer(Modifier.height(12.dp))
+                Text("انتهت اللعبة!", style = MaterialTheme.typography.headlineLarge, color = YemenGold)
+                Spacer(Modifier.height(8.dp))
+                Text(state.statusMessage, color = Color.White, fontSize = 15.sp,
+                    textAlign = TextAlign.Center)
+                Spacer(Modifier.height(20.dp))
+
+                Text("النتيجة النهائية:", style = MaterialTheme.typography.titleMedium, color = YemenSand)
+                Spacer(Modifier.height(12.dp))
+                state.players.forEach { player ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.padding(vertical = 3.dp).fillMaxWidth()
+                    ) {
+                        Box(modifier = Modifier.size(10.dp).background(PlayerColors[player.id], CircleShape))
+                        Spacer(Modifier.width(10.dp))
+                        Text(player.name, color = Color.White, fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp, modifier = Modifier.width(70.dp))
+                        Text("● ${player.redCards}", color = Color(0xFFFF5252), fontSize = 14.sp)
+                        Spacer(Modifier.width(12.dp))
+                        Text("● ${player.blackCards}", color = Color.Gray, fontSize = 14.sp)
+                    }
+                }
+
+                Spacer(Modifier.height(24.dp))
+                Button(
+                    onClick = { viewModel.resetGame() },
+                    colors = ButtonDefaults.buttonColors(containerColor = YemenRed),
+                    shape = RoundedCornerShape(14.dp),
+                    contentPadding = PaddingValues(horizontal = 40.dp, vertical = 14.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("لعبة جديدة", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                }
             }
         }
     }
@@ -347,9 +541,13 @@ fun HumanPlayerArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
                     Box(modifier = Modifier.size(10.dp).background(PlayerColors[0], CircleShape))
                     Spacer(Modifier.width(6.dp))
                     Text(player.name, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                    if (state.currentTurnPlayerId == 0) {
+                    if (state.currentTurnPlayerId == 0 && state.phase == GamePhase.PLAYING) {
                         Spacer(Modifier.width(6.dp))
-                        Box(modifier = Modifier.size(8.dp).background(YemenGold, CircleShape))
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .background(YemenGold, CircleShape)
+                        )
                     }
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -357,9 +555,9 @@ fun HumanPlayerArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
                         Icon(Icons.Default.Star, "حاكم", tint = YemenGold, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
                     }
-                    Text("🟥 ${player.redCards}", color = Color(0xFFFF5252), fontSize = 13.sp)
+                    Text("● ${player.redCards}", color = Color(0xFFFF5252), fontSize = 13.sp)
                     Spacer(Modifier.width(8.dp))
-                    Text("⬛ ${player.blackCards}", color = Color.Gray, fontSize = 13.sp)
+                    Text("● ${player.blackCards}", color = Color.Gray, fontSize = 13.sp)
                 }
             }
 
@@ -380,7 +578,7 @@ fun HumanPlayerArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
                              player.hand.none { it.suit == state.trickSuit })
 
                         val yOffset by animateDpAsState(
-                            targetValue = if (isValidMove) (-12).dp else 0.dp,
+                            targetValue = if (isValidMove) (-16).dp else 0.dp,
                             animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy)
                         )
 
@@ -394,6 +592,9 @@ fun HumanPlayerArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
                                     rotationZ = cardRotation
                                     val pivot = Offset(size.width / 2f, size.height)
                                     transformOrigin = TransformOrigin(pivot.x / size.width, 1f)
+                                    if (isValidMove) {
+                                        shadowElevation = 8f
+                                    }
                                 }
                                 .clickable(enabled = isValidMove) {
                                     viewModel.humanPlayCard(card)
@@ -412,7 +613,6 @@ fun HumanPlayerArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
 
 @Composable
 fun CardView(card: Card, modifier: Modifier = Modifier, facedown: Boolean = false) {
-    val enterTransition = remember { MutableTransitionState(false).apply { targetState = true } }
     var animProgress by remember { mutableStateOf(0f) }
     LaunchedEffect(Unit) {
         for (i in 0..10) {
@@ -432,7 +632,7 @@ fun CardView(card: Card, modifier: Modifier = Modifier, facedown: Boolean = fals
             .width(64.dp)
             .height(92.dp)
             .graphicsLayer(scaleX = scale.value, scaleY = scale.value, alpha = animProgress)
-            .shadow(if (facedown) 2.dp else 6.dp, RoundedCornerShape(10.dp)),
+            .shadow(if (facedown) 2.dp else 8.dp, RoundedCornerShape(10.dp)),
         shape = RoundedCornerShape(10.dp),
         color = if (facedown) CardBackColor else CardWhite
     ) {
@@ -440,19 +640,27 @@ fun CardView(card: Card, modifier: Modifier = Modifier, facedown: Boolean = fals
             CardBack()
         } else {
             Box(modifier = Modifier.fillMaxSize().padding(5.dp)) {
-                Column(modifier = Modifier.align(Alignment.TopStart), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(card.rank.displayName, color = Color(card.suit.color), fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                Column(
+                    modifier = Modifier.align(Alignment.TopStart),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(card.rank.displayName, color = Color(card.suit.color), fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold)
                     Text(card.suit.symbol, color = Color(card.suit.color), fontSize = 11.sp)
                 }
-                Text(card.suit.symbol, color = Color(card.suit.color), fontSize = 28.sp,
+                Text(card.suit.symbol, color = Color(card.suit.color), fontSize = 30.sp,
                     modifier = Modifier.align(Alignment.Center), fontWeight = FontWeight.Bold)
                 Text("${card.points}", color = TextSecondary, fontSize = 8.sp,
-                    modifier = Modifier.align(Alignment.Center).offset(y = 18.dp))
-                Column(modifier = Modifier.align(Alignment.BottomEnd), horizontalAlignment = Alignment.CenterHorizontally) {
+                    modifier = Modifier.align(Alignment.BottomCenter).offset(y = (-2).dp))
+                Column(
+                    modifier = Modifier.align(Alignment.BottomEnd),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
                     Text(card.suit.symbol, color = Color(card.suit.color), fontSize = 11.sp,
                         modifier = Modifier.graphicsLayer(rotationZ = 180f))
                     Text(card.rank.displayName, color = Color(card.suit.color), fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold, modifier = Modifier.graphicsLayer(rotationZ = 180f))
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.graphicsLayer(rotationZ = 180f))
                 }
             }
         }
@@ -464,8 +672,8 @@ fun CardBack() {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val w = size.width; val h = size.height
         drawRoundRect(CardBackColor, cornerRadius = CornerRadius(10f, 10f))
-        drawRoundRect(Color(0xFF8B0000), cornerRadius = CornerRadius(10f, 10f), topLeft = Offset(4f, 4f),
-            size = Size(w - 8f, h - 8f), style = Stroke(width = 2f))
+        drawRoundRect(Color(0xFF8B0000), cornerRadius = CornerRadius(10f, 10f),
+            topLeft = Offset(4f, 4f), size = Size(w - 8f, h - 8f), style = Stroke(width = 2f))
         val cx = w / 2f; val cy = h / 2f
         drawCircle(Color(0x44FFD700), w * 0.25f, Offset(cx, cy))
         drawCircle(Color(0x44FFD700), w * 0.1f, Offset(cx, cy))
@@ -483,16 +691,21 @@ fun BiddingDialog(state: GameState, viewModel: GameViewModel) {
             modifier = Modifier.fillMaxWidth().padding(24.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier.padding(24.dp).statusBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("🎯 دورك في المزايدة", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = YemenGold)
+                Text("🎯", fontSize = 36.sp)
+                Spacer(Modifier.height(8.dp))
+                Text("دورك في المزايدة", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = YemenGold)
                 Spacer(Modifier.height(8.dp))
                 Text("أعلى مزايدة: ${state.highestBid}", fontSize = 16.sp, color = TextSecondary)
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(4.dp))
+                val biddersLeft = 5 - state.passedPlayers.size
+                Text("المتبقي: $biddersLeft لاعبين", fontSize = 13.sp, color = TextSecondary.copy(alpha = 0.7f))
+                Spacer(Modifier.height(24.dp))
 
                 val nextBid = kotlin.math.max(105, state.highestBid + 5)
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -500,7 +713,7 @@ fun BiddingDialog(state: GameState, viewModel: GameViewModel) {
                         onClick = { viewModel.humanPass() },
                         shape = RoundedCornerShape(14.dp),
                         border = BorderStroke(2.dp, Color(0xFF666666)),
-                        modifier = Modifier.height(52.dp)
+                        modifier = Modifier.height(54.dp)
                     ) {
                         Text("انسحب", fontSize = 16.sp, color = Color(0xFF999999))
                     }
@@ -509,7 +722,7 @@ fun BiddingDialog(state: GameState, viewModel: GameViewModel) {
                         colors = ButtonDefaults.buttonColors(containerColor = YemenRed),
                         shape = RoundedCornerShape(14.dp),
                         elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 6.dp),
-                        modifier = Modifier.height(52.dp)
+                        modifier = Modifier.height(54.dp)
                     ) {
                         Text("مزايدة $nextBid", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
@@ -528,14 +741,18 @@ fun FieldDecisionDialog(state: GameState, viewModel: GameViewModel) {
             modifier = Modifier.fillMaxWidth().padding(24.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
         ) {
             Column(
                 modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("📋 قرار الميدان", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = YemenGold)
+                Text("📋", fontSize = 36.sp)
                 Spacer(Modifier.height(8.dp))
+                Text("قرار الميدان", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = YemenGold)
+                Spacer(Modifier.height(8.dp))
+                Text("المزايدة: ${state.highestBid}", fontSize = 14.sp, color = TextSecondary)
+                Spacer(Modifier.height(4.dp))
                 Text("أوراق الميدان:", fontSize = 14.sp, color = TextSecondary)
                 Spacer(Modifier.height(12.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -543,25 +760,25 @@ fun FieldDecisionDialog(state: GameState, viewModel: GameViewModel) {
                         CardView(card = card)
                     }
                 }
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(24.dp))
                 Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    OutlinedButton(
+                    Button(
                         onClick = { viewModel.humanAcceptField() },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
                         shape = RoundedCornerShape(14.dp),
-                        border = BorderStroke(2.dp, Color(0xFF388E3C)),
+                        elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 6.dp),
                         modifier = Modifier.height(52.dp)
                     ) {
-                        Text("قبول ✅", fontSize = 16.sp, color = Color(0xFF4CAF50))
+                        Text("قبول", fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
                     if (state.highestBid >= 140) {
-                        Button(
+                        OutlinedButton(
                             onClick = { viewModel.humanRejectField() },
-                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFC62828)),
                             shape = RoundedCornerShape(14.dp),
-                            elevation = ButtonDefaults.elevatedButtonElevation(defaultElevation = 6.dp),
+                            border = BorderStroke(2.dp, Color(0xFFC62828)),
                             modifier = Modifier.height(52.dp)
                         ) {
-                            Text("رفض ❌", fontSize = 16.sp)
+                            Text("رفض", fontSize = 16.sp, color = Color(0xFFE57373))
                         }
                     }
                 }
@@ -583,13 +800,15 @@ fun DiscardingDialog(state: GameState, viewModel: GameViewModel) {
             modifier = Modifier.fillMaxWidth().padding(16.dp),
             shape = RoundedCornerShape(24.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFF1A1A2E)),
-            elevation = CardDefaults.cardElevation(defaultElevation = 12.dp)
+            elevation = CardDefaults.cardElevation(defaultElevation = 16.dp)
         ) {
             Column(
-                modifier = Modifier.padding(20.dp),
+                modifier = Modifier.padding(20.dp).statusBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text("🎴 توزيع 4 أوراق واختيار الحكم", fontSize = 20.sp,
+                Text("🎴", fontSize = 32.sp)
+                Spacer(Modifier.height(8.dp))
+                Text("توزيع الأوراق واختيار الحكم", fontSize = 20.sp,
                     fontWeight = FontWeight.Bold, color = YemenGold)
                 Spacer(Modifier.height(16.dp))
 
@@ -605,8 +824,10 @@ fun DiscardingDialog(state: GameState, viewModel: GameViewModel) {
                             color = if (isSelected) Color(suit.color).copy(alpha = 0.2f) else Color(0xFF2D2D44),
                             border = BorderStroke(2.dp, if (isSelected) Color(suit.color) else Color.Transparent)
                         ) {
-                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally) {
+                            Column(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
                                 Text(suit.symbol, fontSize = 22.sp, color = Color(suit.color))
                                 Text(suit.arabicName, fontSize = 11.sp, color = Color(suit.color))
                             }
@@ -661,7 +882,7 @@ fun DiscardingDialog(state: GameState, viewModel: GameViewModel) {
                     shape = RoundedCornerShape(14.dp),
                     modifier = Modifier.fillMaxWidth().height(48.dp)
                 ) {
-                    Text("تأكيد ✅", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    Text("تأكيد", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
