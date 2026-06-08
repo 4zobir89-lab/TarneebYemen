@@ -338,7 +338,8 @@ fun TableCenterArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
 @Composable
 fun CenterLabel(text: String) {
     Text(text, style = MaterialTheme.typography.labelSmall, color = TextSecondary,
-        modifier = Modifier.align(Alignment.TopCenter).padding(bottom = 4.dp))
+        textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 2.dp))
 }
 
 // ─── Player Avatar ────────────────────────────────────────────
@@ -419,7 +420,7 @@ fun RoundEndOverlay(state: GameState) {
 
     AnimatedVisibility(
         visible = visible,
-        enter = fadeIn(tween(500)) + scaleIn(initialScale = 0.8f, tween(500))
+        enter = fadeIn(tween(500)) + scaleIn(tween(500), initialScale = 0.8f)
     ) {
         Box(
             modifier = Modifier.fillMaxSize().background(Color(0x88000000)),
