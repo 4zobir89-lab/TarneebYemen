@@ -463,8 +463,8 @@ fun CardView(card: Card, modifier: Modifier = Modifier, facedown: Boolean = fals
 fun CardBack() {
     Canvas(modifier = Modifier.fillMaxSize()) {
         val w = size.width; val h = size.height
-        drawRoundRect(CardBackColor, CornerRadius(10f, 10f))
-        drawRoundRect(Color(0xFF8B0000), CornerRadius(10f, 10f), topLeft = Offset(4f, 4f),
+        drawRoundRect(CardBackColor, cornerRadius = CornerRadius(10f, 10f))
+        drawRoundRect(Color(0xFF8B0000), cornerRadius = CornerRadius(10f, 10f), topLeft = Offset(4f, 4f),
             size = Size(w - 8f, h - 8f), style = Stroke(width = 2f))
         val cx = w / 2f; val cy = h / 2f
         drawCircle(Color(0x44FFD700), w * 0.25f, Offset(cx, cy))
