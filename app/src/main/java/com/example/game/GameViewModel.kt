@@ -15,7 +15,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     val state: StateFlow<GameState> = _state.asStateFlow()
     val soundManager = SoundManager(application)
 
-    private var dealerId = 0
     private var kiayalId = 1
 
     init {
@@ -30,7 +29,6 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun startGame() {
-        dealerId = 0
         kiayalId = 1
         startNewRound()
     }
@@ -97,11 +95,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun nextBidder() {
         val st = _state.value
-        if (st.passedPlayers.size == 4 && st.highestBidderId != null) {
+        val highestBidderPassed = st.highestBidderId != null && st.passedPlayers.contains(st.highestBidderId)
+
+        if (st.passedPlayers.size >= 4 && !highestBidderPassed && st.highestBidderId != null) {
             endBidding(st.highestBidderId)
             return
         }
-        if (st.passedPlayers.size == 5) {
+        if (st.passedPlayers.size == 5 || highestBidderPassed) {
             _state.update { it.copy(statusMessage = "الجميع انسحب من المزايدة، يتم إعادة التوزيع...") }
             viewModelScope.launch { delay(2000); kiayalId = (kiayalId + 1) % 5; startNewRound() }
             return
@@ -210,8 +210,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             players = newPlayers,
             trumpSuit = trump,
             phase = GamePhase.PLAYING,
-            currentTurnPlayerId = kiayalId,
-            trickStarterId = kiayalId,
+            currentTurnPlayerId = hakemId,
+            trickStarterId = hakemId,
             statusMessage = "الحكم هو ${trump.arabicName} ${trump.symbol}. ${_state.value.players[hakemId].name} يبدأ!"
         )}
         handleAITurn()
@@ -264,19 +264,19 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val trickSuit = st.trickSuit!!
         val trump = st.trumpSuit!!
 
-        var winnerId = st.trickStarterId
-        var highestCard = st.trickCards[winnerId]!!
+        val trickEntries = st.trickCards.entries.toList()
+        var winnerId = trickEntries.first().key
+        var highestCard = trickEntries.first().value
 
-        for ((pId, card) in st.trickCards) {
+        for (entry in trickEntries) {
+            val pId = entry.key
+            val card = entry.value
             if (pId == winnerId) continue
-            if (card.suit == trump && highestCard.suit != trump) {
+            val beatsTrump = card.suit == trump && highestCard.suit != trump
+            val beatsSameSuit = card.suit == highestCard.suit && card.rank.ordinal > highestCard.rank.ordinal
+            if (beatsTrump || beatsSameSuit) {
                 winnerId = pId
                 highestCard = card
-            } else if (card.suit == highestCard.suit) {
-                if (card.rank.ordinal > highestCard.rank.ordinal) {
-                    winnerId = pId
-                    highestCard = card
-                }
             }
         }
 
@@ -298,7 +298,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             )
         }
 
-        if (_state.value.roundTrickCount == 8) {
+        if (_state.value.roundTrickCount >= 8) {
             endRound()
         } else {
             handleAITurn()
@@ -340,7 +340,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val st = _state.value
         var newPlayers = st.players
 
-        var dahamer = newPlayers.find { it.redCards >= 3 }
+        val dahamer = newPlayers.find { it.redCards >= 3 }
         if (dahamer != null) {
             val hasBlacks = newPlayers.any { it.blackCards > 0 }
             soundManager.playWin()
@@ -402,14 +402,24 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         } else 0
         val totalStrength = handValue + trumpBonus
 
-        if (totalStrength > 70 && st.highestBid < 140) {
-            placeBid(aiPlayer.id, kotlin.math.max(105, st.highestBid + 5))
-        } else if (totalStrength > 55 && st.highestBid < 125) {
-            placeBid(aiPlayer.id, kotlin.math.max(105, st.highestBid + 5))
-        } else if (st.highestBid == 100 && totalStrength > 45) {
-            placeBid(aiPlayer.id, 105)
-        } else {
-            passBid(aiPlayer.id)
+        val isHighestBidder = st.highestBidderId == aiPlayer.id
+
+        when {
+            totalStrength > 70 && st.highestBid < 140 -> {
+                placeBid(aiPlayer.id, kotlin.math.max(105, st.highestBid + 5))
+            }
+            totalStrength > 55 && st.highestBid < 125 -> {
+                placeBid(aiPlayer.id, kotlin.math.max(105, st.highestBid + 5))
+            }
+            st.highestBid == 100 && totalStrength > 45 -> {
+                placeBid(aiPlayer.id, 105)
+            }
+            isHighestBidder -> {
+                nextBidder()
+            }
+            else -> {
+                passBid(aiPlayer.id)
+            }
         }
     }
 
@@ -477,15 +487,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val currentWinner = findCurrentWinner(trickCards, trickSuit, trump)
 
         val canWin = validCards.any { card ->
-            (card.suit == trump && (currentWinner.suit != trump || card.rank.ordinal > currentWinner.rank.ordinal)) ||
-            (card.suit == trickSuit && card.rank.ordinal > currentWinner.rank.ordinal && trickSuit != trump) ||
-            (card.suit == trump && currentWinner.suit == trump && card.rank.ordinal > currentWinner.rank.ordinal)
+            val beatsWithTrump = card.suit == trump && (currentWinner.suit != trump || card.rank.ordinal > currentWinner.rank.ordinal)
+            val beatsSuit = card.suit == trickSuit && card.rank.ordinal > currentWinner.rank.ordinal
+            beatsWithTrump || beatsSuit
         }
 
         return if (canWin) {
             val winningCards = validCards.filter { card ->
-                (card.suit == trump && (currentWinner.suit != trump || card.rank.ordinal > currentWinner.rank.ordinal)) ||
-                (card.suit == trickSuit && card.rank.ordinal > currentWinner.rank.ordinal && (trickSuit != trump || card.suit == trump))
+                val beatsWithTrump = card.suit == trump && (currentWinner.suit != trump || card.rank.ordinal > currentWinner.rank.ordinal)
+                val beatsSuit = card.suit == trickSuit && card.rank.ordinal > currentWinner.rank.ordinal
+                beatsWithTrump || beatsSuit
             }
             winningCards.minByOrNull { it.points } ?: validCards.first()
         } else {
@@ -494,11 +505,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun findCurrentWinner(trickCards: Map<Int, Card>, trickSuit: Suit, trump: Suit): Card {
-        var winner = trickCards.values.first()
-        for (card in trickCards.values.drop(1)) {
-            if (card.suit == trump && winner.suit != trump) {
-                winner = card
-            } else if (card.suit == winner.suit && card.rank.ordinal > winner.rank.ordinal) {
+        val entries = trickCards.entries.toList()
+        if (entries.isEmpty()) return trickCards.values.first()
+        var winner = entries.first().value
+        for (entry in entries.drop(1)) {
+            val card = entry.value
+            val beatsTrump = card.suit == trump && winner.suit != trump
+            val beatsSameSuit = card.suit == winner.suit && card.rank.ordinal > winner.rank.ordinal
+            if (beatsTrump || beatsSameSuit) {
                 winner = card
             }
         }
