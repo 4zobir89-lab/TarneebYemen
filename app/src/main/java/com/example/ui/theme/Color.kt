@@ -21,6 +21,7 @@ val CardWhite = Color(0xFFFEFEFE)
 val CardRed = Color(0xFFD32F2F)
 val CardBlack = Color(0xFF1A1A1A)
 val CardShadow = Color(0x40000000)
+val CardBackColor = Color(0xFF1A237E)
 
 // UI Colors
 val StatusGold = Color(0xFFFFD700)

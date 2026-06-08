@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.*
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
+import kotlinx.coroutines.delay
 import com.example.game.*
 import com.example.ui.theme.*
 
@@ -44,7 +46,7 @@ fun GameScreen(modifier: Modifier = Modifier, viewModel: GameViewModel = viewMod
 
         TopInfoBar(state)
 
-        TableCenterArea(state, viewModel)
+        TableCenterArea(state, viewModel, Modifier.align(Alignment.Center))
 
         PlayerAvatar(state, 1, Modifier.align(Alignment.CenterEnd).padding(end = 12.dp))
         PlayerAvatar(state, 2, Modifier.align(Alignment.TopEnd).padding(top = 100.dp, end = 72.dp))
@@ -192,9 +194,9 @@ fun TrumpBadge(suit: Suit) {
 // ─── Table Center Area ────────────────────────────────────────
 
 @Composable
-fun TableCenterArea(state: GameState, viewModel: GameViewModel) {
+fun TableCenterArea(state: GameState, viewModel: GameViewModel, modifier: Modifier = Modifier) {
     Box(
-        modifier = Modifier.align(Alignment.Center).fillMaxWidth().height(220.dp),
+        modifier = modifier.fillMaxWidth().height(220.dp),
         contentAlignment = Alignment.Center
     ) {
         if (state.phase == GamePhase.FIELD_DECISION && state.field.isNotEmpty()) {
