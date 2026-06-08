@@ -1,0 +1,6 @@
+{
+  "name": "الترمب اليمني 187",
+  "description": "لعبة الترمب اليمني 187 الجماعية",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
