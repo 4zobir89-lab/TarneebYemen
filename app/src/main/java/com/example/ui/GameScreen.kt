@@ -16,11 +16,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.*
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.*
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -337,27 +337,12 @@ fun TrumpRevealAnimation(trumpSuit: Suit) {
 
 @Composable
 fun CardBackLarge() {
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val w = size.width; val h = size.height
-        drawRoundRect(CardBackColor, cornerRadius = CornerRadius(18f, 18f))
-        drawRoundRect(Color(0xFF8B0000), cornerRadius = CornerRadius(18f, 18f),
-            topLeft = Offset(6f, 6f), size = Size(w - 12f, h - 12f), style = Stroke(width = 2.5f))
-
-        val cx = w / 2f; val cy = h / 2f
-        val diamondPath = Path().apply {
-            val s = w * 0.15f
-            moveTo(cx, cy - s)
-            lineTo(cx + s * 0.7f, cy)
-            lineTo(cx, cy + s)
-            lineTo(cx - s * 0.7f, cy)
-            close()
-        }
-        drawPath(diamondPath, Color(0x55FFD700), style = Stroke(2f))
-        drawCircle(Color(0x33FFD700), w * 0.28f, Offset(cx, cy))
-        drawCircle(Color(0x22FFD700), w * 0.18f, Offset(cx, cy))
-        drawLine(Color(0x28FFD700), Offset(cx - w * 0.2f, cy), Offset(cx + w * 0.2f, cy), strokeWidth = 1.5f)
-        drawLine(Color(0x28FFD700), Offset(cx, cy - w * 0.2f), Offset(cx, cy + w * 0.2f), strokeWidth = 1.5f)
-    }
+    Image(
+        painter = painterResource(R.drawable.card_back),
+        contentDescription = "ظهر الورقة",
+        modifier = Modifier.fillMaxSize(),
+        contentScale = ContentScale.FillBounds
+    )
 }
 
 // ─── Table Center Area ────────────────────────────────────────
@@ -758,6 +743,72 @@ fun HumanPlayerArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
     }
 }
 
+// ─── Card to Image Resource Mapping ──────────────────────────
+
+private fun Card.imageRes(): Int {
+    val suitName = when (suit) {
+        Suit.HEARTS -> "hearts"
+        Suit.DIAMONDS -> "diamonds"
+        Suit.CLUBS -> "clubs"
+        Suit.SPADES -> "spades"
+    }
+    val rankFile = when (rank) {
+        Rank.ACE -> "a"
+        Rank.TWO -> "2"
+        Rank.SIX -> "6"
+        Rank.SEVEN -> "7"
+        Rank.EIGHT -> "8"
+        Rank.NINE -> "9"
+        Rank.TEN -> "10"
+        Rank.JACK -> "j"
+        Rank.QUEEN -> "q"
+        Rank.KING -> "k"
+    }
+    return when ("${suitName}_${rankFile}") {
+        "hearts_6" -> R.drawable.card_hearts_6
+        "hearts_7" -> R.drawable.card_hearts_7
+        "hearts_8" -> R.drawable.card_hearts_8
+        "hearts_9" -> R.drawable.card_hearts_9
+        "hearts_10" -> R.drawable.card_hearts_10
+        "hearts_j" -> R.drawable.card_hearts_j
+        "hearts_q" -> R.drawable.card_hearts_q
+        "hearts_k" -> R.drawable.card_hearts_k
+        "hearts_a" -> R.drawable.card_hearts_a
+        "hearts_2" -> R.drawable.card_hearts_2
+        "diamonds_6" -> R.drawable.card_diamonds_6
+        "diamonds_7" -> R.drawable.card_diamonds_7
+        "diamonds_8" -> R.drawable.card_diamonds_8
+        "diamonds_9" -> R.drawable.card_diamonds_9
+        "diamonds_10" -> R.drawable.card_diamonds_10
+        "diamonds_j" -> R.drawable.card_diamonds_j
+        "diamonds_q" -> R.drawable.card_diamonds_q
+        "diamonds_k" -> R.drawable.card_diamonds_k
+        "diamonds_a" -> R.drawable.card_diamonds_a
+        "diamonds_2" -> R.drawable.card_diamonds_2
+        "clubs_6" -> R.drawable.card_clubs_6
+        "clubs_7" -> R.drawable.card_clubs_7
+        "clubs_8" -> R.drawable.card_clubs_8
+        "clubs_9" -> R.drawable.card_clubs_9
+        "clubs_10" -> R.drawable.card_clubs_10
+        "clubs_j" -> R.drawable.card_clubs_j
+        "clubs_q" -> R.drawable.card_clubs_q
+        "clubs_k" -> R.drawable.card_clubs_k
+        "clubs_a" -> R.drawable.card_clubs_a
+        "clubs_2" -> R.drawable.card_clubs_2
+        "spades_6" -> R.drawable.card_spades_6
+        "spades_7" -> R.drawable.card_spades_7
+        "spades_8" -> R.drawable.card_spades_8
+        "spades_9" -> R.drawable.card_spades_9
+        "spades_10" -> R.drawable.card_spades_10
+        "spades_j" -> R.drawable.card_spades_j
+        "spades_q" -> R.drawable.card_spades_q
+        "spades_k" -> R.drawable.card_spades_k
+        "spades_a" -> R.drawable.card_spades_a
+        "spades_2" -> R.drawable.card_spades_2
+        else -> R.drawable.card_back
+    }
+}
+
 // ─── Card View ────────────────────────────────────────────────
 
 @Composable
@@ -784,7 +835,11 @@ fun CardView(
 
     val targetScale = 0.85f + dealProgress * 0.15f
 
-    Surface(
+    Image(
+        painter = painterResource(
+            if (facedown) R.drawable.card_back else card.imageRes()
+        ),
+        contentDescription = if (facedown) "ظهر الورقة" else "${card.rank.displayName} ${card.suit.arabicName}",
         modifier = modifier
             .width(64.dp)
             .height(92.dp)
@@ -801,67 +856,18 @@ fun CardView(
                 if (facedown) 2.dp else (if (isWinner) (8.dp + 6.dp * winGlow) else 8.dp),
                 RoundedCornerShape(10.dp)
             ),
-        shape = RoundedCornerShape(10.dp),
-        color = if (facedown) CardBackColor else CardWhite,
-        border = if (isWinner) BorderStroke(
-            (1.5f + winGlow * 1.5f).dp,
-            YemenGold.copy(alpha = 0.5f + winGlow * 0.5f)
-        ) else null
-    ) {
-        if (facedown) {
-            CardBack()
-        } else {
-            Box(modifier = Modifier.fillMaxSize().padding(5.dp)) {
-                Column(
-                    modifier = Modifier.align(Alignment.TopStart),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(card.rank.displayName, color = Color(card.suit.color), fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold)
-                    Text(card.suit.symbol, color = Color(card.suit.color), fontSize = 11.sp)
-                }
-                Text(card.suit.symbol, color = Color(card.suit.color), fontSize = 30.sp,
-                    modifier = Modifier.align(Alignment.Center), fontWeight = FontWeight.Bold)
-                Text("${card.points}", color = TextSecondary, fontSize = 8.sp,
-                    modifier = Modifier.align(Alignment.BottomCenter).offset(y = (-2).dp))
-                Column(
-                    modifier = Modifier.align(Alignment.BottomEnd),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(card.suit.symbol, color = Color(card.suit.color), fontSize = 11.sp,
-                        modifier = Modifier.graphicsLayer(rotationZ = 180f))
-                    Text(card.rank.displayName, color = Color(card.suit.color), fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.graphicsLayer(rotationZ = 180f))
-                }
-            }
-        }
-    }
+        contentScale = ContentScale.FillBounds
+    )
 }
 
 @Composable
 fun CardBack() {
-    Canvas(modifier = Modifier.fillMaxSize()) {
-        val w = size.width; val h = size.height
-        drawRoundRect(CardBackColor, cornerRadius = CornerRadius(10f, 10f))
-        drawRoundRect(Color(0xFF8B0000), cornerRadius = CornerRadius(10f, 10f),
-            topLeft = Offset(4f, 4f), size = Size(w - 8f, h - 8f), style = Stroke(width = 2f))
-
-        val cx = w / 2f; val cy = h / 2f
-        val diamondPath = Path().apply {
-            val s = w * 0.15f
-            moveTo(cx, cy - s)
-            lineTo(cx + s * 0.7f, cy)
-            lineTo(cx, cy + s)
-            lineTo(cx - s * 0.7f, cy)
-            close()
-        }
-        drawPath(diamondPath, Color(0x55FFD700), style = Stroke(1.5f))
-        drawCircle(Color(0x44FFD700), w * 0.25f, Offset(cx, cy))
-        drawCircle(Color(0x33FFD700), w * 0.12f, Offset(cx, cy))
-        drawLine(Color(0x33FFD700), Offset(cx - w * 0.2f, cy), Offset(cx + w * 0.2f, cy), strokeWidth = 1.5f)
-        drawLine(Color(0x33FFD700), Offset(cx, cy - w * 0.2f), Offset(cx, cy + w * 0.2f), strokeWidth = 1.5f)
-    }
+    Image(
+        painter = painterResource(R.drawable.card_back),
+        contentDescription = "ظهر الورقة",
+        modifier = Modifier.fillMaxSize(),
+        contentScale = ContentScale.FillBounds
+    )
 }
 
 // ─── Bidding Dialog ───────────────────────────────────────────
