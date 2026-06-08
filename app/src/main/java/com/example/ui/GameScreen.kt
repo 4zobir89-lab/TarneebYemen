@@ -798,7 +798,7 @@ fun CardView(
                 }
             }
             .shadow(
-                if (facedown) 2.dp else (if (isWinner) (8.dp + winGlow * 6.dp) else 8.dp),
+                if (facedown) 2.dp else (if (isWinner) (8.dp + 6.dp * winGlow) else 8.dp),
                 RoundedCornerShape(10.dp)
             ),
         shape = RoundedCornerShape(10.dp),
