@@ -1,6 +1,6 @@
 package com.example.ui
 
-import android.content.Context
+import com.example.R
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -16,7 +16,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.draw.*
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.*
@@ -335,17 +334,6 @@ fun TrumpRevealAnimation(trumpSuit: Suit) {
             )
         }
     }
-}
-
-@Composable
-fun CardBackLarge() {
-    val ctx = LocalContext.current
-    Image(
-        painter = painterResource(ctx.drawableId("card_back")),
-        contentDescription = "ظهر الورقة",
-        modifier = Modifier.fillMaxSize(),
-        contentScale = ContentScale.FillBounds
-    )
 }
 
 // ─── Table Center Area ────────────────────────────────────────
@@ -746,32 +734,52 @@ fun HumanPlayerArea(state: GameState, viewModel: GameViewModel, modifier: Modifi
     }
 }
 
-// ─── Resource Helpers ────────────────────────────────────────
 
-private fun Context.drawableId(name: String): Int {
-    return resources.getIdentifier(name, "drawable", packageName)
-}
 
-private fun Card.imageName(): String {
-    val suitName = when (suit) {
-        Suit.HEARTS -> "hearts"
-        Suit.DIAMONDS -> "diamonds"
-        Suit.CLUBS -> "clubs"
-        Suit.SPADES -> "spades"
-    }
-    val rankFile = when (rank) {
-        Rank.ACE -> "a"
-        Rank.TWO -> "2"
-        Rank.SIX -> "6"
-        Rank.SEVEN -> "7"
-        Rank.EIGHT -> "8"
-        Rank.NINE -> "9"
-        Rank.TEN -> "10"
-        Rank.JACK -> "j"
-        Rank.QUEEN -> "q"
-        Rank.KING -> "k"
-    }
-    return "card_${suitName}_${rankFile}"
+// ─── Card to Image Resource Mapping ──────────────────────────
+
+private fun Card.imageRes(): Int = when ("${suit.name.lowercase()}_${rank.name.lowercase()}") {
+    "hearts_6" -> R.drawable.card_hearts_6
+    "hearts_7" -> R.drawable.card_hearts_7
+    "hearts_8" -> R.drawable.card_hearts_8
+    "hearts_9" -> R.drawable.card_hearts_9
+    "hearts_10" -> R.drawable.card_hearts_10
+    "hearts_jack" -> R.drawable.card_hearts_j
+    "hearts_queen" -> R.drawable.card_hearts_q
+    "hearts_king" -> R.drawable.card_hearts_k
+    "hearts_ace" -> R.drawable.card_hearts_a
+    "hearts_two" -> R.drawable.card_hearts_2
+    "diamonds_6" -> R.drawable.card_diamonds_6
+    "diamonds_7" -> R.drawable.card_diamonds_7
+    "diamonds_8" -> R.drawable.card_diamonds_8
+    "diamonds_9" -> R.drawable.card_diamonds_9
+    "diamonds_10" -> R.drawable.card_diamonds_10
+    "diamonds_jack" -> R.drawable.card_diamonds_j
+    "diamonds_queen" -> R.drawable.card_diamonds_q
+    "diamonds_king" -> R.drawable.card_diamonds_k
+    "diamonds_ace" -> R.drawable.card_diamonds_a
+    "diamonds_two" -> R.drawable.card_diamonds_2
+    "clubs_6" -> R.drawable.card_clubs_6
+    "clubs_7" -> R.drawable.card_clubs_7
+    "clubs_8" -> R.drawable.card_clubs_8
+    "clubs_9" -> R.drawable.card_clubs_9
+    "clubs_10" -> R.drawable.card_clubs_10
+    "clubs_jack" -> R.drawable.card_clubs_j
+    "clubs_queen" -> R.drawable.card_clubs_q
+    "clubs_king" -> R.drawable.card_clubs_k
+    "clubs_ace" -> R.drawable.card_clubs_a
+    "clubs_two" -> R.drawable.card_clubs_2
+    "spades_6" -> R.drawable.card_spades_6
+    "spades_7" -> R.drawable.card_spades_7
+    "spades_8" -> R.drawable.card_spades_8
+    "spades_9" -> R.drawable.card_spades_9
+    "spades_10" -> R.drawable.card_spades_10
+    "spades_jack" -> R.drawable.card_spades_j
+    "spades_queen" -> R.drawable.card_spades_q
+    "spades_king" -> R.drawable.card_spades_k
+    "spades_ace" -> R.drawable.card_spades_a
+    "spades_two" -> R.drawable.card_spades_2
+    else -> R.drawable.card_back
 }
 
 // ─── Card View ────────────────────────────────────────────────
@@ -800,15 +808,13 @@ fun CardView(
 
     val targetScale = 0.85f + dealProgress * 0.15f
 
-    val ctx = LocalContext.current
+    val cardRes = if (facedown) R.drawable.card_back else card.imageRes()
+
     Image(
-        painter = painterResource(
-            if (facedown) ctx.drawableId("card_back") else ctx.drawableId(card.imageName())
-        ),
+        painter = painterResource(cardRes),
         contentDescription = if (facedown) "ظهر الورقة" else "${card.rank.displayName} ${card.suit.arabicName}",
         modifier = modifier
-            .width(64.dp)
-            .height(92.dp)
+            .width(62.dp).height(90.dp)
             .graphicsLayer {
                 scaleX = targetScale
                 scaleY = targetScale
@@ -820,7 +826,7 @@ fun CardView(
             }
             .shadow(
                 if (facedown) 2.dp else (if (isWinner) (8.dp + 6.dp * winGlow) else 8.dp),
-                RoundedCornerShape(10.dp)
+                RoundedCornerShape(8.dp)
             ),
         contentScale = ContentScale.FillBounds
     )
@@ -828,9 +834,18 @@ fun CardView(
 
 @Composable
 fun CardBack() {
-    val ctx = LocalContext.current
     Image(
-        painter = painterResource(ctx.drawableId("card_back")),
+        painter = painterResource(R.drawable.card_back),
+        contentDescription = "ظهر الورقة",
+        modifier = Modifier.fillMaxSize(),
+        contentScale = ContentScale.FillBounds
+    )
+}
+
+@Composable
+fun CardBackLarge() {
+    Image(
+        painter = painterResource(R.drawable.card_back),
         contentDescription = "ظهر الورقة",
         modifier = Modifier.fillMaxSize(),
         contentScale = ContentScale.FillBounds
